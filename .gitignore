@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+
+# let user add them manually
+common.csv
+data/
+
+# AI dev stuff
+SCHEMA.md
+PROJECT_PLAN.md

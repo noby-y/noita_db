@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noita-db"
+version = "0.1.0"
+description = "Build a queryable SQLite database of Noita entities, components and spells"
+requires-python = ">=3.11"
+dependencies = ["luaparser>=3.2"]
+
+[project.optional-dependencies]
+tui = ["textual>=1.0"]
+dev = ["pytest>=8", "textual>=1.0"]
+
+[project.scripts]
+noita-db = "noita_db.cli:main"
+noita-tui = "noita_tui.cli:main"
+
+[tool.setuptools]
+packages = ["noita_db", "noita_tui"]
+
+[tool.setuptools.package-data]
+noita_tui = ["*.tcss"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

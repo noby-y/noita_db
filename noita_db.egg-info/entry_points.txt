@@ -1,0 +1,3 @@
+[console_scripts]
+noita-db = noita_db.cli:main
+noita-tui = noita_tui.cli:main

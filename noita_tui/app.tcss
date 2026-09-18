@@ -1,0 +1,82 @@
+/* The dropdown layer is what lets a completion list overhang the one-line
+   row it belongs to. Everything else is plain layout. */
+Screen {
+    layers: base dropdown;
+}
+
+/* The two views are built the same way, so their parts are classes rather
+   than ids: only one of them is on screen at a time. */
+ContentSwitcher {
+    height: 1fr;
+}
+
+.toolbar {
+    height: 3;
+}
+
+.toolbar #search { width: 2fr; }
+.toolbar #tag { width: 1fr; }
+.toolbar #spell-search { width: 1fr; }
+.toolbar Button { width: 14; min-width: 14; }
+
+.filters {
+    max-height: 40%;
+    height: auto;
+    border-bottom: solid $panel;
+}
+
+.main {
+    height: 1fr;
+}
+
+#groups-pane {
+    width: 26;
+    border-right: solid $panel;
+}
+
+#groups-pane Label {
+    padding: 0 1;
+    background: $panel;
+    width: 1fr;
+}
+
+.results-pane { width: 3fr; }
+
+.detail-pane {
+    width: 2fr;
+    min-width: 34;
+    max-width: 56;
+    border-left: solid $panel;
+}
+
+.detail-pane Tree { height: 1fr; }
+
+/* Not docked: the Footer already docks to the bottom, and two docked widgets
+   would draw over each other. */
+#status {
+    height: 1;
+    padding: 0 1;
+    background: $panel;
+    color: $text-muted;
+}
+
+#status.error {
+    background: $error-muted;
+    color: $text;
+}
+
+.modal {
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    border: thick $accent;
+    background: $surface;
+    align: center middle;
+}
+
+ModalScreen {
+    align: center middle;
+}
+
+.modal Label { padding-bottom: 1; }
+.modal Button { width: 1fr; margin-top: 1; }
