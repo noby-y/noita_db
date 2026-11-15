@@ -7,6 +7,7 @@ import pytest
 from noita_db import names
 from noita_db.build import MissingInput, build
 from noita_db.cli import main
+from noita_db.db import SPELL_PROJECTILE_GROUP
 
 
 @pytest.fixture
@@ -145,33 +146,35 @@ def test_extra_languages_can_be_imported(data_root: Path, tmp_path: Path):
         'SELECT count(*) FROM translations').fetchone()[0] >= 8
 
 
-def test_rebuild_drops_groups_unless_asked(data_root: Path, tmp_path: Path):
-    db_path = tmp_path / 'noita.db'
-    build(data_root, db_path)
+def add_favourites(db_path: Path) -> None:
     connection = sqlite3.connect(db_path)
-    connection.execute("INSERT INTO entity_groups (id, name) VALUES (1, 'favourites')")
+    group_id = connection.execute(
+        "INSERT INTO entity_groups (name) VALUES ('favourites')"
+        ' RETURNING id').fetchone()[0]
     connection.execute(
-        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (1, ?)',
-        ('data/entities/projectiles/light_bullet.xml#',))
+        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (?, ?)',
+        (group_id, 'data/entities/projectiles/light_bullet.xml#'))
     connection.commit()
     connection.close()
 
+
+def test_rebuild_drops_groups_unless_asked(data_root: Path, tmp_path: Path):
+    db_path = tmp_path / 'noita.db'
+    build(data_root, db_path)
+    add_favourites(db_path)
+
     build(data_root, db_path)
     connection = sqlite3.connect(db_path)
-    assert connection.execute('SELECT count(*) FROM entity_groups').fetchone()[0] == 0
+    # Only the derived group is left; the hand-made one went with the rebuild.
+    assert [r[0] for r in connection.execute('SELECT name FROM entity_groups')] == \
+        [SPELL_PROJECTILE_GROUP]
     connection.close()
 
 
 def test_preserve_groups_keeps_membership_across_a_rebuild(data_root: Path, tmp_path: Path):
     db_path = tmp_path / 'noita.db'
     build(data_root, db_path)
-    connection = sqlite3.connect(db_path)
-    connection.execute("INSERT INTO entity_groups (id, name) VALUES (1, 'favourites')")
-    connection.execute(
-        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (1, ?)',
-        ('data/entities/projectiles/light_bullet.xml#',))
-    connection.commit()
-    connection.close()
+    add_favourites(db_path)
 
     build(data_root, db_path, preserve_groups=True)
     connection = sqlite3.connect(db_path)
@@ -182,6 +185,46 @@ def test_preserve_groups_keeps_membership_across_a_rebuild(data_root: Path, tmp_
         ' JOIN entity_groups g ON g.id = m.group_id'
         " WHERE g.name = 'favourites'").fetchone()
     assert row == ('projectile_default',)
+    connection.close()
+
+
+def test_spell_projectile_group_is_built_from_the_links(database):
+    rows = database.execute(
+        'SELECT e.source_file FROM entity_group_members m'
+        ' JOIN entities e ON e.entity_key = m.entity_key'
+        ' JOIN entity_groups g ON g.id = m.group_id'
+        ' WHERE g.name = ? ORDER BY e.source_file',
+        (SPELL_PROJECTILE_GROUP,)).fetchall()
+    linked = database.execute(
+        'SELECT DISTINCT entity_file FROM spell_projectile_links'
+        ' WHERE entity_id IS NOT NULL ORDER BY entity_file').fetchall()
+    assert [r[0] for r in rows] == [r[0] for r in linked]
+    assert rows                                  # the fixture data does link some
+
+
+def test_spell_projectile_group_is_regenerated_not_appended(data_root: Path, tmp_path: Path):
+    db_path = tmp_path / 'noita.db'
+    build(data_root, db_path)
+    connection = sqlite3.connect(db_path)
+    group_id, before = connection.execute(
+        'SELECT g.id, count(*) FROM entity_groups g JOIN entity_group_members m'
+        ' ON m.group_id = g.id WHERE g.name = ? GROUP BY g.id',
+        (SPELL_PROJECTILE_GROUP,)).fetchone()
+    # A key from an older game version, the kind --preserve-groups would carry.
+    connection.execute(
+        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (?, ?)',
+        (group_id, 'data/entities/projectiles/gone.xml#'))
+    connection.commit()
+    connection.close()
+
+    build(data_root, db_path, preserve_groups=True)
+    connection = sqlite3.connect(db_path)
+    assert one(connection, 'SELECT count(*) FROM entity_groups WHERE name = ?',
+               SPELL_PROJECTILE_GROUP) == 1
+    assert one(connection,
+               'SELECT count(*) FROM entity_group_members m JOIN entity_groups g'
+               ' ON g.id = m.group_id WHERE g.name = ?',
+               SPELL_PROJECTILE_GROUP) == before
     connection.close()
 
 

@@ -122,11 +122,14 @@ def test_text_scope_searches_name_display_name_and_file(connection, catalog):
 
 
 def test_group_scope_restricts_to_members(connection, catalog):
-    connection.execute("INSERT INTO entity_groups (id, name) VALUES (1, 'favourites')")
+    group_id = connection.execute(
+        "INSERT INTO entity_groups (name) VALUES ('favourites')"
+        ' RETURNING id').fetchone()[0]
     connection.execute(
-        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (1, ?)',
-        ('data/entities/projectiles/fuse.xml#',))
-    assert names(connection, [], scope=Scope(group_id=1), catalog=catalog) == ['fuse']
+        'INSERT INTO entity_group_members (group_id, entity_key) VALUES (?, ?)',
+        (group_id, 'data/entities/projectiles/fuse.xml#'))
+    assert names(connection, [], scope=Scope(group_id=group_id),
+                 catalog=catalog) == ['fuse']
 
 
 def test_unknown_identifiers_never_reach_the_sql(catalog):

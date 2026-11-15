@@ -1,7 +1,9 @@
 """Build the database from a Noita data root.
 
 Every run rebuilds from scratch; there is no incremental path. The only thing
-that can survive a rebuild is entity groups, and only when asked for.
+that can survive a rebuild is entity groups, and only when asked for. One group
+is not carried but derived: `db.SPELL_PROJECTILE_GROUP` is rewritten every run
+from the entities the spells fire.
 """
 
 from __future__ import annotations
@@ -91,6 +93,8 @@ def build(root: Path, db_path: Path, preserve_groups: bool = False,
         writer.write_spells(spell_list, columns)
         writer.write_warnings(resolver.warnings)
         writer.restore_groups(saved_groups)
+        grouped = writer.write_spell_projectile_group()
+        log(f'grouping {grouped} entities as {db.SPELL_PROJECTILE_GROUP!r}')
 
         result = BuildResult(
             entities=_count(connection, 'entities'),

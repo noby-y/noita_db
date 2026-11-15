@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import pytest
 
+from noita_db.db import SPELL_PROJECTILE_GROUP
 from noita_tui import catalog as catalog_module
 from noita_tui import db, groups
 from noita_tui.query import Filter, Scope, entity_query
 
 FUSE = 'data/entities/projectiles/fuse.xml#'
+
+# Stage 1 derives one group on every build, so a freshly built database is never
+# without groups; these tests look past it at the ones the TUI made.
 
 
 @pytest.fixture
@@ -44,19 +48,21 @@ def test_a_single_entity_goes_in_and_out(connection):
     group = groups.create(connection, 'favourites')
     assert groups.add_entity(connection, group.id, FUSE)
     assert not groups.add_entity(connection, group.id, FUSE)
-    assert groups.membership(connection, FUSE) == ['favourites']
+    # fuse.xml is a spell projectile, so the derived group names it as well.
+    assert groups.membership(connection, FUSE) == ['favourites', SPELL_PROJECTILE_GROUP]
     assert groups.remove_entity(connection, group.id, FUSE)
-    assert groups.membership(connection, FUSE) == []
+    assert groups.membership(connection, FUSE) == [SPELL_PROJECTILE_GROUP]
 
 
 def test_deleting_a_group_takes_its_members(connection):
     group = groups.create(connection, 'doomed')
     groups.add_entity(connection, group.id, FUSE)
     groups.delete(connection, group.id)
-    assert groups.list_groups(connection) == []
+    assert [g.name for g in groups.list_groups(connection)] == [SPELL_PROJECTILE_GROUP]
     # The cascade only fires because db.connect turns foreign keys on.
     assert connection.execute(
-        'SELECT count(*) FROM entity_group_members').fetchone()[0] == 0
+        'SELECT count(*) FROM entity_group_members WHERE group_id = ?',
+        (group.id,)).fetchone()[0] == 0
 
 
 def test_membership_can_outlive_the_entity_it_names(connection):
@@ -71,7 +77,8 @@ def test_group_counts_are_listed(connection, catalog):
     group = groups.create(connection, 'sprites')
     groups.add_result(connection, group.id,
                       entity_query([Filter('SpriteComponent')], catalog=catalog))
-    listed = groups.list_groups(connection)
+    listed = [g for g in groups.list_groups(connection)
+              if g.name != SPELL_PROJECTILE_GROUP]
     assert [(g.name, g.members) for g in listed] == [('sprites', 2)]
 
 
