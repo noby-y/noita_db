@@ -1,2 +1,0 @@
-noita_db
-noita_tui

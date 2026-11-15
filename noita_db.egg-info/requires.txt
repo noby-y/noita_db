@@ -1,8 +1,0 @@
-luaparser>=3.2
-
-[dev]
-pytest>=8
-textual>=1.0
-
-[tui]
-textual>=1.0
