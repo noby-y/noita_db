@@ -146,6 +146,42 @@ def test_problem_describes_a_half_typed_row(catalog):
     assert problem(Filter('ProjectileComponent'), catalog) is None
     assert problem(Filter('ProjectileComponent', 'damage', '=', ''), catalog) == 'no value'
     assert problem(Filter('ProjectileComponent', 'damage', '=', '5'), catalog) is None
+    # An empty field is a row still being typed; `""` is a question.
+    assert problem(Filter('ProjectileComponent', 'damage', '=', '""'), catalog) is None
+
+
+def test_a_quoted_empty_value_finds_an_attribute_holding_nothing(connection, catalog):
+    # homing.xml has a bare <LuaComponent/>, so its script_source_file is the
+    # documented default of ''. The two that name a script are not empty.
+    empty = [Filter('LuaComponent', 'script_source_file', '=', '""')]
+    assert names(connection, empty, catalog=catalog) == ['homing']
+    assert names(connection, [Filter('LuaComponent', 'script_source_file', '!=', '""')],
+                 catalog=catalog) == ['base_projectile', 'projectile_default']
+
+
+def test_an_empty_value_also_matches_a_null_column(connection, catalog):
+    # A container field with no rows leaves its column NULL rather than '' —
+    # 18137 cells of the shipped data are that — and asking for empty means
+    # asking for both. Nothing in the fixture is NULL, so the row is made here.
+    spark = connection.execute(
+        "SELECT id FROM entities WHERE name = 'spark'").fetchone()['id']
+    connection.execute(
+        'INSERT INTO LuaComponent (component_id, entity_id, instance_index,'
+        ' script_source_file) VALUES (900, ?, 0, NULL)', (spark,))
+    filters = [Filter('LuaComponent', 'script_source_file', '=', '""')]
+    assert names(connection, filters, catalog=catalog) == ['homing', 'spark']
+
+
+def test_quotes_also_pin_a_value_that_is_not_empty(connection, catalog):
+    filters = [Filter('SpriteComponent', 'image_file', '=', '"data/spark.xml"')]
+    assert names(connection, filters, catalog=catalog) == ['projectile_default']
+
+
+def test_an_empty_value_is_only_meaningful_for_equality(catalog):
+    item = Filter('LuaComponent', 'script_source_file', '<', '""')
+    assert problem(item, catalog) == '< needs something to compare'
+    with pytest.raises(FilterError):
+        entity_query([item], catalog=catalog)
 
 
 def test_a_quoted_column_survives_a_dotted_path(connection, catalog):

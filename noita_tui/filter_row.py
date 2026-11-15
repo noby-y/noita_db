@@ -100,7 +100,9 @@ class FilterRow(FieldRow):
                               tooltip='leave blank to match any entity carrying '
                                       'the component')
         yield CompletionInput(lambda: list(OPERATORS), value='=', id='op')
-        yield CompletionInput(self._values, id='value', placeholder='value')
+        yield CompletionInput(self._values, id='value', placeholder='value',
+                              tooltip='a quoted value is matched literally, so '
+                                      '"" asks for an attribute holding nothing')
         yield Button('✕', id='remove', variant='error')
 
     @property

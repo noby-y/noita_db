@@ -10,6 +10,11 @@ in front" expressible.
 Identifiers are interpolated because SQLite cannot parametrise them, so every
 component type and attribute is checked against the catalog first and quoted
 after. Values are always bound.
+
+A value in double quotes is taken literally, which is the only way to say
+"empty": a bare empty field means the row is still being typed, so
+`muzzle_flash_file = ""` is how you ask for the 423 projectiles that have no
+muzzle flash.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from .db import quote
 
 OPERATORS = ('=', '!=', '<', '<=', '>', '>=', 'contains')
 ORDERING_OPERATORS = frozenset({'<', '<=', '>', '>='})
+EQUALITY_OPERATORS = frozenset({'=', '!='})
 COMBINATORS = ('AND', 'OR', 'XOR')
 
 LIKE_ESCAPE = '\\'
@@ -94,8 +100,12 @@ def problem(item: Filter, catalog: Catalog) -> str | None:
         return f'{item.component_type} has no attribute {item.attribute}'
     if item.op not in OPERATORS:
         return f'unknown operator {item.op}'
-    if item.value == '':
-        return 'no value'
+    text, quoted = unquote(item.value)
+    if text == '':
+        if not quoted:
+            return 'no value'
+        if item.op not in EQUALITY_OPERATORS:
+            return f'{item.op} needs something to compare'
     return None
 
 
@@ -206,15 +216,45 @@ def _alias(component_type: str, group: list[Filter], catalog: Catalog,
 
 def _predicate(alias: str, item: Filter, numeric: bool) -> tuple[str, list]:
     column = f'{alias}.{quote(item.attribute)}'
+    text, _ = unquote(item.value)
+    if text == '':
+        return empty_predicate(column, item.op), []
     if item.op == 'contains':
         return (f'CAST({column} AS TEXT) LIKE ? {LIKE_ESCAPE_SQL}',
-                [f'%{like_escape(item.value)}%'])
-    value = coerce(item.value, numeric)
+                [f'%{like_escape(text)}%'])
+    value = coerce(text, numeric)
     if item.op == '!=':
         # `col != ?` is NULL, and therefore false, for a NULL column. An
         # undocumented attribute left NULL is still "not 5".
         return f'{column} IS NOT ?', [value]
     return f'{column} {item.op} ?', [value]
+
+
+def unquote(value: str) -> tuple[str, bool]:
+    """Split a value field into what to compare and whether it was quoted.
+
+    Quoting is what makes an empty value sayable at all: an empty field is a
+    row still being typed, so `""` is the way to ask for one holding nothing.
+    Unquoted text is returned untouched — the ordinary case must keep its
+    surrounding spaces, because `coerce` and `LIKE` deal with those themselves.
+    """
+    text = value.strip()
+    if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+        return text[1:-1], True
+    return value, False
+
+
+def empty_predicate(column: str, op: str) -> str:
+    """What `= ""` compiles to.
+
+    An attribute the XML never wrote is `''` when its documented field has a
+    default and NULL when it has none — 18137 cells of the shipped data are the
+    latter, all of them runtime state like `mWhoShot`. Both read as empty here,
+    because the question being asked is "nothing there".
+    """
+    if op == '!=':
+        return f"({column} IS NOT NULL AND {column} <> '')"
+    return f"({column} IS NULL OR {column} = '')"
 
 
 def coerce(value: str, numeric: bool) -> object:

@@ -14,7 +14,9 @@ can be satisfied by two different writes. That is what you want: the writes are
 cumulative, not alternatives.
 
 An empty value means "this is set" rather than "this equals nothing", which is
-how you ask for every spell that touches `screenshake` at all.
+how you ask for every spell that touches `screenshake` at all. `""` is the other
+question — a column holding nothing — spelled the same way as on the entity
+side.
 """
 
 from __future__ import annotations
@@ -23,8 +25,8 @@ from dataclasses import dataclass
 
 from .catalog import EFFECT_SOURCE, LINK_TABLES, SPELL_SOURCE, SpellCatalog
 from .db import quote
-from .query import (LIKE_ESCAPE_SQL, OPERATORS, Query, coerce, like_escape,
-                    FilterError)
+from .query import (EQUALITY_OPERATORS, LIKE_ESCAPE_SQL, OPERATORS, Query, coerce,
+                    empty_predicate, like_escape, unquote, FilterError)
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,9 @@ def problem(item: SpellFilter, catalog: SpellCatalog) -> str | None:
             return f'{item.source} has no column {key}'
     if item.op not in OPERATORS:
         return f'unknown operator {item.op}'
+    text, quoted = unquote(item.value)
+    if quoted and text == '' and item.op not in EQUALITY_OPERATORS:
+        return f'{item.op} needs something to compare'
     return None
 
 
@@ -151,12 +156,15 @@ def _effect_value(item: SpellFilter) -> tuple[str, list]:
     searching `screenshake = 10` finds it: the operator here compares the value
     written, not the way it was written. `effect.op` is where you say `add`.
     """
+    text, _ = unquote(item.value)
     if item.op == 'contains':
         return (f'CAST(COALESCE(x.value_text, x.value_num) AS TEXT) LIKE ?'
-                f' {LIKE_ESCAPE_SQL}', [f'%{like_escape(item.value)}%'])
-    number = _as_number(item.value)
+                f' {LIKE_ESCAPE_SQL}', [f'%{like_escape(text)}%'])
+    number = _as_number(text)
     if number is None:
-        column, value = 'x.value_text', item.value
+        # `""` lands here as the empty string, which is a write of "", not a
+        # write of nothing: an effect row exists only where something was set.
+        column, value = 'x.value_text', text
     else:
         column, value = 'x.value_num', number
     if item.op == '!=':
@@ -165,14 +173,18 @@ def _effect_value(item: SpellFilter) -> tuple[str, list]:
 
 
 def _compare(column: str, item: SpellFilter, numeric: bool) -> tuple[str, list]:
-    if not item.value.strip():
+    text, quoted = unquote(item.value)
+    if not text.strip() and not quoted:
         # Most spell columns are NULL for most spells — `spell.max_uses` with no
         # value is the useful question "which spells are limited at all?".
         return f'{column} IS NOT NULL', []
+    if text == '':
+        # …which leaves `""` to mean the opposite: nothing there.
+        return empty_predicate(column, item.op), []
     if item.op == 'contains':
         return (f'CAST({column} AS TEXT) LIKE ? {LIKE_ESCAPE_SQL}',
-                [f'%{like_escape(item.value)}%'])
-    value = coerce(item.value, numeric)
+                [f'%{like_escape(text)}%'])
+    value = coerce(text, numeric)
     if item.op == '!=':
         return f'{column} IS NOT ?', [value]
     return f'{column} {item.op} ?', [value]
