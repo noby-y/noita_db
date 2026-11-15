@@ -255,6 +255,62 @@ def test_the_spell_detail_shows_effects_and_links(app):
     drive(app, scenario)
 
 
+def test_f10_exports_the_filtered_result(app, tmp_path):
+    target = tmp_path / 'lua.txt'
+
+    async def scenario(pilot):
+        first_row(app).query_one('#type', Input).value = 'LuaComponent'
+        await pilot.pause()
+        await pilot.press('f10')
+        await pilot.pause()
+        prompt = app.screen.query_one('#prompt', Input)
+        assert prompt.value == 'entities.txt'   # a default, offered pre-selected
+        prompt.value = str(target)
+        await pilot.press('enter')
+        await pilot.pause()
+        assert target.read_text(encoding='utf-8').splitlines() == [
+            'data/entities/base_projectile.xml',
+            'data/entities/misc/homing.xml',
+            'data/entities/projectiles/light_bullet.xml',
+        ]
+    drive(app, scenario)
+
+
+def test_an_export_over_an_existing_file_asks_first(app, tmp_path):
+    target = tmp_path / 'taken.txt'
+    target.write_text('do not lose me\n', encoding='utf-8')
+
+    async def scenario(pilot):
+        await pilot.press('f10')
+        await pilot.pause()
+        app.screen.query_one('#prompt', Input).value = str(target)
+        await pilot.press('enter')
+        await pilot.pause()
+        await pilot.press('escape')         # refuse the overwrite
+        await pilot.pause()
+        assert target.read_text(encoding='utf-8') == 'do not lose me\n'
+
+        await pilot.press('f10')
+        await pilot.pause()
+        app.screen.query_one('#prompt', Input).value = str(target)
+        await pilot.press('enter')
+        await pilot.pause()
+        await pilot.press('enter')         # the Overwrite button has the focus
+        await pilot.pause()
+        assert len(target.read_text(encoding='utf-8').splitlines()) == 9
+    drive(app, scenario)
+
+
+def test_export_says_no_on_the_spells_view(app, tmp_path):
+    async def scenario(pilot):
+        await pilot.press('f9')
+        await pilot.pause()
+        await pilot.press('f10')
+        await pilot.pause()
+        assert app.screen is app.screen_stack[0]     # no prompt opened
+    drive(app, scenario)
+
+
 def test_group_keys_say_no_on_the_spells_view(app):
     async def scenario(pilot):
         await pilot.press('f9')

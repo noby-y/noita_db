@@ -20,7 +20,7 @@ from textual.widgets.option_list import Option
 from textual.widgets.tree import TreeNode
 
 from . import catalog as catalog_module
-from . import db, detail, groups, spell_detail
+from . import db, detail, export, groups, spell_detail
 from .filter_row import FieldRow, FilterRow
 from .query import (COMBINATORS, ORDERING_OPERATORS, Query, Scope, entity_query,
                     problem)
@@ -31,6 +31,7 @@ from .widgets import CompletionInput, ConfirmScreen, PromptScreen
 
 ALL_ENTITIES = 'all entities'
 ENTITIES_VIEW, SPELLS_VIEW = 'entities-view', 'spells-view'
+DEFAULT_EXPORT = 'entities.txt'
 # Tags are wide, rarely readable in a column, and already in the detail pane.
 # The widths are fixed: an auto-sized column measures every cell it holds, which
 # is the one slow part of redrawing 3776 rows on a keystroke, and the columns
@@ -57,6 +58,7 @@ class NoitaTUI(App):
         ('f7', 'toggle_scope', 'scope'),
         ('f8', 'clear_scope', 'clear'),
         ('f9', 'switch_view', 'view'),
+        ('f10', 'export_paths', 'export'),
         ('ctrl+q', 'quit', 'quit'),
     ]
 
@@ -575,6 +577,43 @@ class NoitaTUI(App):
         self.query_one('#tag', Input).value = ''
         self.query_one('#search', Input).value = ''
         self.run_query()
+
+    # -- export ------------------------------------------------------------
+
+    def action_export_paths(self) -> None:
+        """Write the current result out as one entity path per line."""
+        if self.on_spells:
+            self.notify('export writes entity paths; f9 for the entity view',
+                        severity='warning')
+            return
+        paths = export.entity_paths(self.connection, self.current_query)
+        if not paths:
+            self.notify('nothing to export', severity='warning')
+            return
+
+        def chosen(name: str | None) -> None:
+            if not name:
+                return
+            target = Path(name)
+            if target.exists():
+                # Whatever is already there is not ours to replace unasked.
+                self.push_screen(
+                    ConfirmScreen(f'{target} exists. Overwrite it?', 'Overwrite'),
+                    lambda yes: self.write_paths(target, paths) if yes else None)
+            else:
+                self.write_paths(target, paths)
+        self.push_screen(
+            PromptScreen(f'Export {len(paths)} entity path'
+                         f'{"" if len(paths) == 1 else "s"} to',
+                         'file name', DEFAULT_EXPORT), chosen)
+
+    def write_paths(self, target: Path, paths: list[str]) -> None:
+        try:
+            written = export.write(target, paths)
+        except OSError as error:
+            self.notify(f'could not write {target}: {error}', severity='error')
+            return
+        self.notify(f'wrote {written} entity paths to {target}')
 
     # -- filters -----------------------------------------------------------
 

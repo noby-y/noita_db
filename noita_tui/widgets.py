@@ -162,18 +162,24 @@ class PromptScreen(ModalScreen[str | None]):
 
     BINDINGS = [('escape', 'dismiss_prompt', 'Cancel')]
 
-    def __init__(self, title: str, placeholder: str = '') -> None:
+    def __init__(self, title: str, placeholder: str = '', value: str = '') -> None:
         super().__init__()
         self.title_text = title
         self.placeholder = placeholder
+        self.value = value
 
     def compose(self) -> ComposeResult:
         with Vertical(classes='modal'):
             yield Label(self.title_text)
-            yield Input(placeholder=self.placeholder, id='prompt')
+            yield Input(value=self.value, placeholder=self.placeholder, id='prompt')
 
     def on_mount(self) -> None:
-        self.query_one('#prompt', Input).focus()
+        # Selected rather than merely filled: enter takes a default file name,
+        # and typing replaces it instead of appending to it.
+        field = self.query_one('#prompt', Input)
+        field.focus()
+        if field.value:
+            field.select_all()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value.strip() or None)
@@ -185,14 +191,15 @@ class PromptScreen(ModalScreen[str | None]):
 class ConfirmScreen(ModalScreen[bool]):
     BINDINGS = [('escape', 'refuse', 'Cancel')]
 
-    def __init__(self, question: str) -> None:
+    def __init__(self, question: str, confirm: str = 'Delete') -> None:
         super().__init__()
         self.question = question
+        self.confirm = confirm
 
     def compose(self) -> ComposeResult:
         with Vertical(classes='modal'):
             yield Label(self.question)
-            yield Button('Delete', variant='error', id='confirm')
+            yield Button(self.confirm, variant='error', id='confirm')
             yield Button('Cancel', id='cancel')
 
     def on_mount(self) -> None:
