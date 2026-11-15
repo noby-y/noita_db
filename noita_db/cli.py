@@ -21,7 +21,7 @@ def make_parser() -> argparse.ArgumentParser:
                     'components and spells.')
     parser.add_argument(
         'root', nargs='?', default='.', type=Path,
-        help='directory holding data/, comp_docs/ and common.csv (default: .)')
+        help='directory holding data/ and comp_docs/ (default: .)')
     parser.add_argument(
         '-o', '--output', default=Path('noita.db'), type=Path,
         help='database to write (default: noita.db)')

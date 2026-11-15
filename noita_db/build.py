@@ -17,7 +17,7 @@ from .entities import EntityResolver
 
 DATA_DIR = 'data'
 COMP_DOCS_DIR = 'comp_docs'
-COMMON_CSV = 'common.csv'
+COMMON_CSV = 'data/translations/common.csv'
 GUN_ACTIONS = 'data/scripts/gun/gun_actions.lua'
 
 

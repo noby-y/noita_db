@@ -249,9 +249,30 @@ def test_cli_builds(data_root: Path, tmp_path: Path):
 
 
 def test_translation_lookup_strips_the_dollar(data_root: Path):
-    table = names.load(data_root / 'common.csv')
+    table = names.load(data_root / 'data/translations/common.csv')
     assert table.lookup('$action_homing') == 'Homing'
     assert table.lookup('action_homing') == 'Homing'
     assert table.lookup(None) is None
     # A quoted field containing a comma stays one value.
     assert table.lookup('$actiondesc_light_bullet') == 'A weak, sparkling projectile'
+
+
+def test_the_language_code_row_is_not_mistaken_for_data(data_root: Path):
+    """The row above the names holds codes, not translations.
+
+    Reading it as the header would offer `en` and the file's `NOTES` and
+    `max length` columns as languages, and leave `current_language` looking
+    like a translatable string.
+    """
+    table = names.load(data_root / 'data/translations/common.csv')
+    assert table.lookup('current_language') is None
+    assert table.entries.keys().isdisjoint(
+        {('action_homing', 'en'), ('action_homing', 'max length')})
+
+
+def test_a_file_already_cut_down_to_the_names_row_still_loads(tmp_path: Path):
+    """What the old "copy it to the root" setup left behind."""
+    path = tmp_path / 'common.csv'
+    path.write_text('current_language,English\naction_homing,Homing\n',
+                    encoding='utf-8')
+    assert names.load(path).lookup('$action_homing') == 'Homing'

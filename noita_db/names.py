@@ -1,9 +1,14 @@
-"""`common.csv` — Noita's translation table.
+"""`common.csv` — Noita's translation table, read from `data/translations/`.
 
-The header names each column's language (`current_language,English,русский,...`),
-and the first column holds the code name an entity's `name="$..."` attribute
-points at. Only English is stored by default, but the table is keyed by
-language so adding more is an insert, not a migration.
+The file leads with a row of language codes (`,en,ru,pt-br,...`) and names the
+same columns in the row after, keyed `current_language,English,русский,...`.
+The names row is the one used as the header: `--languages English` is friendlier
+than `en`, and the codes row carries two trailing columns (`NOTES`, `max
+length`) that are not languages at all.
+
+The first column holds the code name an entity's `name="$..."` attribute points
+at. Only English is stored by default, but the table is keyed by language so
+adding more is an insert, not a migration.
 """
 
 from __future__ import annotations
@@ -38,6 +43,11 @@ def load(csv_path: Path, languages: tuple[str, ...] = DEFAULT_LANGUAGES) -> Tran
         # csv handles the quoted fields that contain commas ("some, text").
         reader = csv.reader(handle)
         header = next(reader, [])
+        if header and not header[0].strip():
+            # The codes row has nothing in the key column, where every other
+            # row has a code name. So an empty one means the languages are
+            # named in the row below, and this is the file as the game ships it.
+            header = next(reader, [])
         # Column 0 is the key column; the rest are languages, and trailing
         # unnamed columns are padding in the source file.
         columns = {name: index for index, name in enumerate(header)

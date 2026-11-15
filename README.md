@@ -2,17 +2,18 @@
 
 Noita's entity and spell files, in one SQLite database you can query.
 
-Two commands. `noita-db` reads the game's XML, component docs, translations and
-`gun_actions.lua` and writes a `.db` file. `noita-tui` is a terminal browser over
-that file, so you can ask things like "every entity with a projectile that
-explodes for more than 20 radius" without writing SQL.
+Two commands:
+- `noita-db` - reads the game's XML, component docs, translations and `gun_actions.lua`
+and builds a `.db` file.
+- `noita-tui` is a terminal browser over that file, so you can ask things like 
+"every entity with a projectile that explodes for more than 20 radius".
 
 Against the shipped game data you get 3776 entities, 30227 components across 138
 component types, 274 tags, 422 spells and 3607 English strings.
 
 ## Setup
 
-You need Python 3.11 or newer and a copy of Noita's game files.
+You need Python 3.11 or newer and a copy of Noita's game files. 
 
 ```sh
 python -m venv .venv
@@ -35,14 +36,12 @@ noita_tui/
 ...
 ```
 
-1. Unpack `Noita/data/data.wak` into this directory, so that `data/entities/`
-   and `data/scripts/` exist. [noita_wak_tool](https://github.com/dextercd/Noita-WAK-Tools)
-   or any of the community unpackers will do it.
-2. Copy `data/translations/common.csv` up to the repo root.
+That is the whole setup. Everything is read where the game puts it, translations
+included, so there is nothing to copy or rename afterwards.
 
-`noita-db` checks for `data/`, `comp_docs/`, `common.csv` and
-`data/scripts/gun/gun_actions.lua` before it starts, and names whatever is
-missing.
+`noita-db` checks for `data/`, `comp_docs/`,
+`data/translations/common.csv` and `data/scripts/gun/gun_actions.lua` before it
+starts, and names whatever is missing.
 
 ## Building the database
 
@@ -55,7 +54,7 @@ Takes about six seconds over the full `data/` tree on my machine. Progress goes 
 
 | flag | |
 | --- | --- |
-| `root` | directory holding `data/`, `comp_docs/` and `common.csv` (default `.`) |
+| `root` | directory holding `data/` and `comp_docs/` (default `.`) |
 | `-o`, `--output` | database to write (default `noita.db`) |
 | `--preserve-groups` | keep the entity groups already in the database at `-o` |
 | `--languages` | which `common.csv` columns to import (default `English`) |
@@ -64,8 +63,9 @@ Takes about six seconds over the full `data/` tree on my machine. Progress goes 
 You can rebuild it if there are any issues with the db. `--preserve-groups` will save
 any custom entity groups after rebuild.
 
-`--languages` takes the column headings from `common.csv` verbatim:
-`--languages English,Deutsch,日本語`.
+`--languages` takes the names from the `current_language` row of
+`data/translations/common.csv` verbatim, not the language codes in the row above
+it: `--languages English,Deutsch,日本語`.
 
 ## Browsing it
 

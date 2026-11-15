@@ -138,8 +138,11 @@ actions =
 }
 '''
 
+# Laid out as the game ships it: language codes first, the names the importer
+# reads in the row below, and two trailing columns that are not languages.
 COMMON_CSV = '''\
-current_language,English,русский
+,en,ru,,NOTES – use \\n for newline,max length
+current_language,English,русский,,,
 action_light_bullet,Spark bolt,
 actiondesc_light_bullet,"A weak, sparkling projectile",
 action_homing,Homing,
@@ -250,7 +253,9 @@ def data_root(tmp_path: Path) -> Path:
     root = tmp_path / 'root'
     root.mkdir()
     _write_docs(root)
-    (root / 'common.csv').write_text(COMMON_CSV, encoding='utf-8')
+    translations = root / 'data/translations/common.csv'
+    translations.parent.mkdir(parents=True, exist_ok=True)
+    translations.write_text(COMMON_CSV, encoding='utf-8')
     for relative, content in FILES.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
